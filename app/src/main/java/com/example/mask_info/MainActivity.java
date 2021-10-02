@@ -81,8 +81,8 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "getLongitude: " + location.getLongitude());
 
                         //위도경도 값 전달(임시로 대입)
-                        location.setLatitude(37.266389);
-                        location.setLongitude(126.999333);
+//                        location.setLatitude(37.266389);
+//                        location.setLongitude(126.999333);
 
                         viewModel.location = location;
                         viewModel.fetchStoreInfo();
