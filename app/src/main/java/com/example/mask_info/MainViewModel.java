@@ -1,5 +1,6 @@
 package com.example.mask_info;
 
+import android.location.Location;
 import android.util.Log;
 
 import androidx.lifecycle.MutableLiveData;
@@ -21,27 +22,27 @@ import retrofit2.converter.moshi.MoshiConverterFactory;
 
 public class MainViewModel extends ViewModel {
     public static final String TAG = MainViewModel.class.getSimpleName();
-    //변경 가능한 LiveData
+    //변경 가능한 LiveData -> 임시로 public(getter, setter로 하는 게 정석)
     public MutableLiveData<List<Store>> itemLiveData = new MutableLiveData<>();
+    public MutableLiveData<Boolean> loadingLiveData = new MutableLiveData<>();
+
+    public Location location;
 
     private Retrofit retrofit = new Retrofit.Builder()
             .baseUrl(MaskService.BASE_URL)
             .addConverterFactory(MoshiConverterFactory.create())
             .build();
 
-    private MaskService service = retrofit.create(MaskService.class);
-
-    private Call<StoreInfo> storeInfoCall = service.fetchStoreInfo();
-
-    //화면 전환 시 refresh없이 ViewModel 생성 시 한 번만 요청
-    public MainViewModel() {
-        fetchStoreInfo();
-    }
+    private final MaskService service = retrofit.create(MaskService.class);
 
     //LiveData 사용하면 Callback 대체 가능
     public void fetchStoreInfo() {
-        //clone() 안하면 화면 전환 시 에러!!
-        storeInfoCall.clone().enqueue(new Callback<StoreInfo>() {
+        //로딩 시작 -> LiveData 활용
+        loadingLiveData.setValue(true);
+
+        //위도 경도 값 전달
+        service.fetchStoreInfo(location.getLatitude(), location.getLongitude())
+                .enqueue(new Callback<StoreInfo>() {
             @Override
             public void onResponse(Call<StoreInfo> call, Response<StoreInfo> response) {
                 Log.d(TAG, "onResponse: refresh");
@@ -50,9 +51,21 @@ public class MainViewModel extends ViewModel {
                 List<Store> items = response.body().getStores()
                         .stream()
                         .filter(item -> item.getRemainStat() != null)
+                        .filter(item -> !item.getRemainStat().equals("empty"))
                         .collect(Collectors.toList());
 
+                for (Store store: items) {
+                    double distance = LocationDistance.distance(
+                            location.getLatitude(), location.getLongitude(), store.getLat(), store.getLng(), "k");
+                    store.setDistance(distance);
+                }
+
+                Collections.sort(items);
+
                 itemLiveData.postValue(items);
+
+                //로딩 끝
+                loadingLiveData.postValue(false);
             }
 
             @Override
@@ -60,6 +73,9 @@ public class MainViewModel extends ViewModel {
                 Log.e(TAG, "onFailure: ", t);
                 //에러 발생 시 빈 리스트 세팅
                 itemLiveData.postValue(Collections.emptyList());
+
+                //로딩 끝
+                loadingLiveData.postValue(false);
             }
         });
     }

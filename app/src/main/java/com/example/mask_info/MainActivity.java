@@ -3,8 +3,8 @@ package com.example.mask_info;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.graphics.Color;
-import android.location.Location;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -23,7 +23,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.mask_info.model.Store;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.gun0912.tedpermission.PermissionListener;
 import com.gun0912.tedpermission.normal.TedPermission;
 
@@ -42,6 +41,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        viewModel = new ViewModelProvider(this).get(MainViewModel.class);
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
@@ -68,13 +69,23 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint("MissingPermission")
     private void performAction() {
         fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
-                    @Override
-                    public void onSuccess(Location location) {
-                        // Got last known location. In some rare situations this can be null.
-                        if (location != null) {
-                            // Logic to handle location object
-                        }
+                .addOnFailureListener(this, e -> {
+                    Log.e(TAG, "performAction: " + e.getCause());
+                })
+                .addOnSuccessListener(this, location -> {
+                    Log.d(TAG, "performAction: " + location);
+
+                    //위도,경도 정보 get
+                    if (location != null) {
+                        Log.d(TAG, "getLatitude: " + location.getLatitude());
+                        Log.d(TAG, "getLongitude: " + location.getLongitude());
+
+                        //위도경도 값 전달(임시로 대입)
+                        location.setLatitude(37.266389);
+                        location.setLongitude(126.999333);
+
+                        viewModel.location = location;
+                        viewModel.fetchStoreInfo();
                     }
                 });
 
@@ -86,10 +97,18 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setAdapter(adapter);
 
         //UI 변경 감지 업데이트
-        viewModel = new ViewModelProvider(this).get(MainViewModel.class);
         viewModel.itemLiveData.observe(this, stores -> {
             adapter.updateItems(stores);
             getSupportActionBar().setTitle("마스크 재고 있는 곳 : " + stores.size() + "곳");
+        });
+
+        //로딩
+        viewModel.loadingLiveData.observe(this, isLoading -> {
+            if (isLoading) {
+                findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
+            } else {
+                findViewById(R.id.progressBar).setVisibility(View.GONE);
+            }
         });
     }
 
@@ -154,7 +173,7 @@ class StoreAdapter extends RecyclerView.Adapter<StoreAdapter.StoreViewHolder> {
 
         holder.tv_name.setText(store.getName());
         holder.tv_addr.setText(store.getAddr());
-        holder.tv_distance.setText("1.0km");
+        holder.tv_distance.setText(String.format("%.2fkm", store.getDistance()));
 
         String remainStat = "충분";
         String countStat = "100개 이상";
@@ -190,7 +209,7 @@ class StoreAdapter extends RecyclerView.Adapter<StoreAdapter.StoreViewHolder> {
     }
 
     @Override
-   public int getItemCount() {
+    public int getItemCount() {
         return mItems.size();
     }
 

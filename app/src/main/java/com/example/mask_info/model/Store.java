@@ -2,7 +2,7 @@ package com.example.mask_info.model;
 
 import com.squareup.moshi.Json;
 
-public class Store {
+public class Store implements Comparable<Store>{
 
     @Json(name = "addr")
     private String addr;
@@ -22,6 +22,16 @@ public class Store {
     private String stockAt;
     @Json(name = "type")
     private String type;
+
+    private double distance;
+
+    public double getDistance() {
+        return distance;
+    }
+
+    public void setDistance(double distance) {
+        this.distance = distance;
+    }
 
     public String getAddr() {
         return addr;
@@ -95,4 +105,9 @@ public class Store {
         this.type = type;
     }
 
+    //정렬 규칮 재정의
+    @Override
+    public int compareTo(Store store) {
+        return Double.compare(distance, store.distance);
+    }
 }
